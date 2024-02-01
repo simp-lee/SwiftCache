@@ -8,9 +8,9 @@ SwiftCache stands out with both Least Recently Used (**LRU**) and First In First
 
 ## Performance
 
-SwiftCache has undergone extensive benchmarking against traditional Go maps and the widely-used go-cache library, showcasing its superior performance in scenarios characterized by high concurrency and large data volumes. The following benchmarks highlight SwiftCache's efficiency, especially when managing **millions of items** and performing concurrent operations. 
+SwiftCache has undergone extensive benchmarking against traditional Go maps and the widely-used `go-cache` library, showcasing its superior performance in scenarios characterized by high concurrency and large data volumes. The following benchmarks highlight SwiftCache's efficiency, especially when managing **millions of items** and performing concurrent operations. 
 
-Benchmarks source code can be found [here](https://github.com/simp-lee/SwiftCache/blob/main/cache_test.go#L885).
+Benchmarks source code can be found [here](https://github.com/simp-lee/SwiftCache/blob/main/cache_test.go#L886).
 
 ```
 goos: windows
@@ -48,7 +48,6 @@ The following benchmark summary showcases SwiftCache's performance in different 
 |                          | go-cache           | 3,054,723      | 412.2           | 100.00%  |
 |                          | Map                | 3,459,856      | 354.6           | 100.00%  |
 +--------------------------+--------------------+----------------+-----------------+----------+
-
 ```
 **GetManyConcurrent Test:** SwiftCache demonstrates exceptional retrieval speeds, with FIFO mode slightly outperforming LRU due to its simpler eviction logic. Both exhibit performance marginally superior to standard Go maps and `go-cache`, consistently achieving up to a 100% hit rate.
 
@@ -72,22 +71,22 @@ A quick start guide to using SwiftCache:
 package main
 
 import (
-	"fmt"
-	"github.com/simp-lee/swiftcache"
+    "fmt"
+    "github.com/simp-lee/swiftcache"
 )
 
 func main() {
-	// Initialize the cache with default settings
-	c, _ := swiftcache.NewCache()
+    // Initialize the cache with default settings
+    c, _ := swiftcache.NewCache()
 
-	// Set a value with default expiration
-	c.Set("myKey", "myValue", swiftcache.DefaultExpiration)
+    // Set a value with default expiration
+    c.Set("myKey", "myValue", swiftcache.DefaultExpiration)
 
-	// Retrieve and check if the value exists
-	value, found := c.Get("myKey")
-	if found {
-		fmt.Println("Found myKey: ", value)
-	}
+    // Retrieve and check if the value exists
+    value, found := c.Get("myKey")
+    if found {
+        fmt.Println("Found myKey: ", value)
+    }
 }
 
 ```
@@ -100,25 +99,25 @@ To customize SwiftCache's behavior, such as segment count or eviction policy:
 package main
 
 import (
-	"github.com/simp-lee/swiftcache"
-	"hash/fnv"
-	"time"
+    "github.com/simp-lee/swiftcache"
+    "hash/fnv"
+    "time"
 )
 
 func main() {
-	cacheConfig := swiftcache.CacheConfig{
-		SegmentCount:      1024,            // Customize the number of segments
-		MaxCacheSize:      5000,            // Set the maximum cache size
-		DefaultExpiration: 5 * time.Minute, // Default expiration time
-		EvictionPolicy:    "LRU",           // Set the eviction policy
-		HashFunc:          fnv.New32,       // Use FNV-1 32-bit hash function
-	}
+    cacheConfig := swiftcache.CacheConfig{
+        SegmentCount:      1024,            // Customize the number of segments
+        MaxCacheSize:      5000,            // Set the maximum cache size
+        DefaultExpiration: 5 * time.Minute, // Default expiration time
+        EvictionPolicy:    "LRU",           // Set the eviction policy
+        HashFunc:          fnv.New32,       // Use FNV-1 32-bit hash function
+    }
 
-	// Initialize the cache with custom settings
-	c, _ := swiftcache.NewCache(cacheConfig)
+    // Initialize the cache with custom settings
+    c, _ := swiftcache.NewCache(cacheConfig)
 
-	// Use the cache with the configured settings
-	// ...
+    // Use the cache with the configured settings
+    // ...
 }
 ```
 
