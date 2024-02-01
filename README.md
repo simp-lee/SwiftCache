@@ -37,7 +37,11 @@ func main() {
 	c, _ := swiftcache.NewCache()
 
 	// Set a value with default expiration
+<<<<<<< HEAD
 	c.Set("myKey", "myValue", swiftcache.DefaultExpiration)
+=======
+	c.Set("myKey", "myValue", c.DefaultExpiration)
+>>>>>>> 8bd872c06f63f217a08171a1df2683e45624f1eb
 
 	// Retrieve and check if the value exists
 	value, found := c.Get("myKey")
