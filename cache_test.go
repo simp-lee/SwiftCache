@@ -2,7 +2,6 @@ package swiftcache
 
 import (
 	"fmt"
-	"github.com/patrickmn/go-cache"
 	"log"
 	"math/rand"
 	"runtime"
@@ -736,6 +735,7 @@ func TestStorePointerToStruct(t *testing.T) {
 	}
 }
 
+// Test LRU eviction policy
 func TestCacheLRUEviction(t *testing.T) {
 	maxSize := 5
 	_cache, _ := NewCache(CacheConfig{
@@ -744,23 +744,24 @@ func TestCacheLRUEviction(t *testing.T) {
 		EvictionPolicy: "LRU",
 	})
 
-	// 填充缓存至最大容量
+	// Populate cache to its maximum capacity
 	for i := 0; i < maxSize; i++ {
 		_cache.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("value%d", i), NoExpiration)
 	}
 
-	// 再次访问第一个键，使其成为最近使用
+	// Re-access the first key to make it recently used
 	_cache.Get("key0")
 
-	// 添加新元素以触发淘汰
+	// Add a new element to trigger eviction
 	_cache.Set("key_new", "value_new", NoExpiration)
 
-	// 检查最早的键（"key1"）是否被淘汰
+	// Check if the earliest key ("key1") was evicted
 	if _, found := _cache.Get("key1"); found {
 		t.Errorf("LRU eviction failed: key1 should have been evicted")
 	}
 }
 
+// Test FIFO eviction policy
 func TestCacheFIFOEviction(t *testing.T) {
 	maxSize := 5
 	_cache, _ := NewCache(CacheConfig{
@@ -769,15 +770,15 @@ func TestCacheFIFOEviction(t *testing.T) {
 		EvictionPolicy: "FIFO",
 	})
 
-	// 填充缓存至最大容量
+	// Populate cache to its maximum capacity
 	for i := 0; i < maxSize; i++ {
 		_cache.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("value%d", i), NoExpiration)
 	}
 
-	// 添加新元素以触发淘汰
+	// Add a new element to trigger eviction
 	_cache.Set("key_new", "value_new", NoExpiration)
 
-	// 检查最早的键（"key0"）是否被淘汰
+	// Check if the earliest key ("key0") was evicted
 	if _, found := _cache.Get("key0"); found {
 		t.Errorf("FIFO eviction failed: key0 should have been evicted")
 	}
@@ -790,7 +791,7 @@ func TestCacheLRUAndFIFOEviction(t *testing.T) {
 	testEvictionPolicy(t, segmentCount, maxSize, "FIFO")
 }
 
-// 辅助函数：返回给定键所属的段索引
+// Returns the segment index for a given key
 func getSegmentIndex(c *Cache, key string) int {
 	hasher := c.hashFunc()
 	_, err := hasher.Write([]byte(key))
@@ -801,7 +802,7 @@ func getSegmentIndex(c *Cache, key string) int {
 	return int(hasher.Sum32() & uint32(c.segmentCount-1))
 }
 
-// 辅助函数：检查是否所有段都已填满
+// Check if all segments are filled
 func allSegmentsFilled(segmentFill []int, maxSize int) bool {
 	for _, fill := range segmentFill {
 		if fill < maxSize {
@@ -811,7 +812,7 @@ func allSegmentsFilled(segmentFill []int, maxSize int) bool {
 	return true
 }
 
-// printCacheContents 打印缓存中的内容，用于调试
+// printCacheContents prints the contents of the cache for debugging
 func printCacheContents(c *Cache) {
 	fmt.Println("Cache contents:")
 	for i, segment := range c.segments {
@@ -851,19 +852,19 @@ func testEvictionPolicy(t *testing.T, segmentCount, maxSize int, policy string) 
 		i++
 	}
 
-	// 添加额外的键以触发淘汰
+	// Add a extraKey to trigger eviction
 	extraKey := fmt.Sprintf("key%d", i+1)
 	segmentIndexOfExtraKey := getSegmentIndex(_cache, extraKey)
 	firstKey := firstTwoKeysInSegment[segmentIndexOfExtraKey][0]
 
 	if policy == "LRU" {
-		// 访问该键，使其成为最近使用过的
+		// Access the first key to make it recently used
 		_cache.Get(firstKey)
 
-		// 添加额外的键以触发淘汰
+		// Add a new element to trigger eviction
 		_cache.Set(extraKey, "extra_value", NoExpiration)
 
-		// 检查第二个键是否被淘汰
+		// Check if the second key was evicted
 		secondKey := firstTwoKeysInSegment[segmentIndexOfExtraKey][1]
 		_, found := _cache.Get(secondKey)
 		if found {
@@ -882,21 +883,20 @@ func testEvictionPolicy(t *testing.T, segmentCount, maxSize int, policy string) 
 
 }
 
-func BenchmarkGetManyConcurrent(b *testing.B) {
+func BenchmarkCacheGetManyConcurrent(b *testing.B) {
 	b.StopTimer()
 
 	_cache, _ := NewCache(CacheConfig{
 		SegmentCount:   1024,
 		MaxCacheSize:   10000,
-		EvictionPolicy: "FIFO",
+		EvictionPolicy: "LRU",
 	})
 
-	// 以下是想加载另一个go-cache库，进行对比，如何优化这个测试？
+	// Load the go-cache library for comparison
 	//_cache := cache.New(5*time.Minute, 0)
 
 	totalHits := int64(0)
 
-	// 准备阶段：填充一些数据到缓存中，以便有一定的命中率
 	for i := 0; i < 1000000; i++ {
 		_cache.Set(fmt.Sprintf("key%d", i), "value"+strconv.Itoa(i), NoExpiration)
 	}
@@ -912,7 +912,7 @@ func BenchmarkGetManyConcurrent(b *testing.B) {
 			localHits := int64(0)
 			for j := 0; j < each; j++ {
 				x := rand.Intn(10000)
-				key := fmt.Sprintf("key%d", x) // 随机访问以产生一定的命中率
+				key := fmt.Sprintf("key%d", x) // Random access to generate a certain hit rate
 				value, found := _cache.Get(key)
 				if found && value == "value"+strconv.Itoa(x) {
 					localHits++
@@ -931,7 +931,7 @@ func BenchmarkGetManyConcurrent(b *testing.B) {
 	b.Logf("Total items: %d, Each: %d, Hit Rate: %.2f%%", _cache.ItemCount(), each, hitRate*100)
 }
 
-func BenchmarkRWMutexMapGetManyConcurrent(b *testing.B) {
+func BenchmarkMapGetManyConcurrent(b *testing.B) {
 	b.StopTimer()
 
 	totalHits := int64(0)
@@ -955,8 +955,8 @@ func BenchmarkRWMutexMapGetManyConcurrent(b *testing.B) {
 		go func(workerID int) {
 			localHits := int64(0)
 			for j := 0; j < each; j++ {
-				x := rand.Intn(100)
-				key := fmt.Sprintf("key%d", x) // 随机访问以产生一定的命中率
+				x := rand.Intn(10000)
+				key := fmt.Sprintf("key%d", x) // Random access to generate a certain hit rate
 				mu.RLock()
 				value, found := m[key]
 				mu.RUnlock()
@@ -980,14 +980,14 @@ func BenchmarkRWMutexMapGetManyConcurrent(b *testing.B) {
 func BenchmarkCacheSetManyConcurrent(b *testing.B) {
 	b.StopTimer()
 
-	//_cache, _ := NewCache(CacheConfig{
-	//	SegmentCount:   1024,
-	//	MaxCacheSize:   10000,
-	//	EvictionPolicy: "FIFO",
-	//})
+	_cache, _ := NewCache(CacheConfig{
+		SegmentCount:   1024,
+		MaxCacheSize:   10000,
+		EvictionPolicy: "LRU",
+	})
 
-	// 以下是想加载另一个go-cache库，进行对比，如何优化这个测试？
-	_cache := cache.New(5*time.Minute, 0)
+	// Load the go-cache library for comparison
+	//_cache := cache.New(5*time.Minute, 0)
 
 	wg := new(sync.WaitGroup)
 	workers := runtime.NumCPU()
@@ -1010,16 +1010,45 @@ func BenchmarkCacheSetManyConcurrent(b *testing.B) {
 	b.StopTimer()
 }
 
+func BenchmarkMapSetManyConcurrent(b *testing.B) {
+	b.StopTimer()
+
+	var m = make(map[string]string)
+	var mu sync.RWMutex
+
+	wg := new(sync.WaitGroup)
+	workers := runtime.NumCPU()
+	each := b.N / workers
+
+	wg.Add(workers)
+
+	for i := 0; i < workers; i++ {
+		go func(workerID int) {
+			for j := 0; j < each; j++ {
+				key := fmt.Sprintf("key%d", j)
+				mu.Lock()
+				m[key] = "value" + strconv.Itoa(j)
+				mu.Unlock()
+			}
+			wg.Done()
+		}(i)
+	}
+
+	b.StartTimer()
+	wg.Wait()
+	b.StopTimer()
+}
+
 func BenchmarkCacheSetAndGetManyConcurrent(b *testing.B) {
 	b.StopTimer()
 
 	_cache, _ := NewCache(CacheConfig{
 		SegmentCount:   1024,
 		MaxCacheSize:   10000,
-		EvictionPolicy: "FIFO",
+		EvictionPolicy: "LRU",
 	})
 
-	// 以下是想加载另一个go-cache库，进行对比，如何优化这个测试？
+	// Load the go-cache library for comparison
 	//_cache := cache.New(5*time.Minute, 0)
 
 	totalHits := int64(0) // 用于统计命中次数
@@ -1032,7 +1061,7 @@ func BenchmarkCacheSetAndGetManyConcurrent(b *testing.B) {
 
 	for i := 0; i < workers; i++ {
 		go func(workerID int) {
-			localHits := int64(0) // 每个协程的命中次数
+			localHits := int64(0)
 			for j := 0; j < each; j++ {
 				key := fmt.Sprintf("key%d", j)
 				expectedValue := "value" + strconv.Itoa(j)
@@ -1042,7 +1071,7 @@ func BenchmarkCacheSetAndGetManyConcurrent(b *testing.B) {
 					localHits++
 				}
 			}
-			atomic.AddInt64(&totalHits, localHits) // 更新总命中次数
+			atomic.AddInt64(&totalHits, localHits)
 			wg.Done()
 		}(i)
 	}
@@ -1053,4 +1082,50 @@ func BenchmarkCacheSetAndGetManyConcurrent(b *testing.B) {
 
 	hitRate := float64(totalHits) / float64(b.N)
 	b.Logf("Total items: %d, Each: %d, Hit Rate: %.2f%%", _cache.ItemCount(), each, hitRate*100)
+}
+
+func BenchmarkMapSetAndGetManyConcurrent(b *testing.B) {
+	b.StopTimer()
+
+	var m = make(map[string]string)
+	var mu sync.RWMutex
+	totalHits := int64(0)
+
+	wg := new(sync.WaitGroup)
+	workers := runtime.NumCPU()
+	each := b.N / workers
+
+	wg.Add(workers)
+
+	for i := 0; i < workers; i++ {
+		go func(workerID int) {
+			localHits := int64(0)
+			for j := 0; j < each; j++ {
+				key := fmt.Sprintf("key%d", j)
+				expectedValue := "value" + strconv.Itoa(j)
+
+				mu.Lock()
+				m[key] = expectedValue
+				mu.Unlock()
+
+				// Read from the map
+				mu.RLock()
+				actualValue, found := m[key]
+				mu.RUnlock()
+
+				if found && actualValue == expectedValue {
+					localHits++
+				}
+			}
+			atomic.AddInt64(&totalHits, localHits)
+			wg.Done()
+		}(i)
+	}
+
+	b.StartTimer()
+	wg.Wait()
+	b.StopTimer()
+
+	hitRate := float64(totalHits) / float64(b.N)
+	b.Logf("Total operations: %d, Hit Rate: %.2f%%", b.N, hitRate*100)
 }

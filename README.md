@@ -1,16 +1,60 @@
 # SwiftCache
 
-SwiftCache is a high-efficiency, in-memory cache library for Go applications, inspired by the segmented caching concepts from [freecache](https://github.com/coocood/freecache) and [bigcache](https://github.com/allegro/bigcache). Streamlined and optimized for single-machine use, the entire library, complete with detailed comments, is under 600 lines, making it a compact yet powerful caching solution. 
+`SwiftCache` is a streamlined, in-memory cache library for Go, inspired by the **segmented caching concepts** from [freecache](https://github.com/coocood/freecache) and [bigcache](https://github.com/allegro/bigcache). Optimized for single-machine use, it encompasses under **600 lines** of code including comments, offering a robust yet concise caching solution. Influenced by [go-cache](https://github.com/patrickmn/go-cache), `SwiftCache` features a user-friendly interface for effortless integration.
 
-In drawing inspiration from the [go-cache](https://github.com/patrickmn/go-cache) library,SwiftCache has been designed with a user-friendly interface, ensuring ease of use right from the get-go.
+A key feature is its thread-safe `map[string]interface{}` structure with support for entry expiration, eliminating the need for content serialization or network transmission. This allows for versatile object storage within the cache.
 
-One of the major advantages of SwiftCache is its core functionality as a thread-safe `map[string]interface{}` that supports expiration times for its entries. This design choice means that there is no need for the contents of the cache to be serialized or transmitted over the network, simplifying the caching process considerably. Any object can be stored.
-
-Moreover, SwiftCache is distinguished by its implementation of both Least Recently Used (LRU) and First In First Out (FIFO) eviction policies. These eviction strategies offer developers the flexibility to choose how cached data is managed and purged, based on their specific application needs. With LRU, items that have not been accessed recently are the first to be evicted, making room for new or more frequently accessed data. On the other hand, the FIFO strategy evicts items in the order they were added, regardless of access frequency.
+SwiftCache stands out with both Least Recently Used (**LRU**) and First In First Out (**FIFO**) eviction policies, giving developers control over data eviction according to their application's requirements. LRU prioritizes evicting least-accessed items, while FIFO removes items based on their addition order, catering to varied caching strategies.
 
 ## Performance
 
-Benchmarking against traditional Go maps and similar cache solutions demonstrates SwiftCache's exceptional performance, especially in environments with high concurrency and large datasets. Detailed benchmark results and comparisons are available in our [performance documentation](#).
+SwiftCache has undergone extensive benchmarking against traditional Go maps and the widely-used go-cache library, showcasing its superior performance in scenarios characterized by high concurrency and large data volumes. The following benchmarks highlight SwiftCache's efficiency, especially when managing **millions of items** and performing concurrent operations. 
+
+Benchmarks source code can be found [here](https://github.com/simp-lee/SwiftCache/blob/main/cache_test.go#L885).
+
+```
+goos: windows
+goarch: amd64
+pkg: github.com/simp-lee/swiftcache
+cpu: 13th Gen Intel(R) Core(TM) i5-13500H
+BenchmarkGetManyConcurrent-16           27213105                41.54 ns/op
+--- BENCH: BenchmarkGetManyConcurrent-16
+cache_test.go:932: Total items: 1000000, Each: 0, Hit Rate: 0.00%
+cache_test.go:932: Total items: 1000000, Each: 6, Hit Rate: 96.00%
+cache_test.go:932: Total items: 1000000, Each: 625, Hit Rate: 100.00%
+cache_test.go:932: Total items: 1000000, Each: 62500, Hit Rate: 100.00%
+cache_test.go:932: Total items: 1000000, Each: 1700819, Hit Rate: 100.00%
+...
+```
+
+The following benchmark summary showcases SwiftCache's performance in different scenarios:
+
+```
++--------------------------+--------------------+----------------+-----------------+----------+
+| Benchmark Scenario       | Cache Solution     | Operations/sec | Latency (ns/op) | Hit Rate |
++--------------------------+--------------------+----------------+-----------------+----------+
+| GetManyConcurrent        | SwiftCache FIFO    | 27,213,105     | 41.54           | 100.00%  |
+|                          | SwiftCache LRU     | 32,707,440     | 50.37           | 100.00%  |
+|                          | go-cache           | 18,846,588     | 66.29           | 100.00%  |
+|                          | Map                | 21,343,122     | 54.70           | 100.00%  |
++--------------------------+--------------------+----------------+-----------------+----------+
+| SetManyConcurrent        | SwiftCache FIFO    | 15,027,386     | 88.20           | -        |
+|                          | SwiftCache LRU     | 14,252,052     | 85.15           | -        |
+|                          | go-cache           | 3,881,776      | 357.3           | -        |
+|                          | Map                | 5,064,476      | 283.7           | -        |
++--------------------------+--------------------+----------------+-----------------+----------+
+| SetAndGetManyConcurrent  | SwiftCache FIFO    | 10,798,873     | 95.76           | 100.00%  |
+|                          | SwiftCache LRU     | 11,510,503     | 103.2           | 100.00%  |
+|                          | go-cache           | 3,054,723      | 412.2           | 100.00%  |
+|                          | Map                | 3,459,856      | 354.6           | 100.00%  |
++--------------------------+--------------------+----------------+-----------------+----------+
+
+```
+**GetManyConcurrent Test:** SwiftCache demonstrates exceptional retrieval speeds, with FIFO mode slightly outperforming LRU due to its simpler eviction logic. Both exhibit performance marginally superior to standard Go maps and `go-cache`, consistently achieving up to a 100% hit rate.
+
+**SetManyConcurrent Test:** In write-heavy scenarios, SwiftCache maintains high performance, with FIFO mode again showing a slight edge over LRU. The efficiency starkly contrasts with the higher latencies observed in `go-cache` and Go maps.
+
+**SetAndGetManyConcurrent Test:** When testing combined set and get operations, SwiftCache's efficiency shines, offering the lowest operation times among the tested solutions and maintaining a 100% hit rate.
 
 ## Usage
 
@@ -56,25 +100,26 @@ To customize SwiftCache's behavior, such as segment count or eviction policy:
 package main
 
 import (
-    "github.com/simp-lee/swiftcache"
-    "time"
+	"github.com/simp-lee/swiftcache"
+	"hash/fnv"
+	"time"
 )
 
 func main() {
-    cacheConfig := swiftcache.CacheConfig{
-        SegmentCount: 1024, // Customize the number of segments
-        MaxCacheSize: 5000, // Set the maximum cache size
-        DefaultExpiration: 5 * time.Minute, // Default expiration time
-        EvictionPolicy: "LRU", // Set the eviction policy
-    }
+	cacheConfig := swiftcache.CacheConfig{
+		SegmentCount:      1024,            // Customize the number of segments
+		MaxCacheSize:      5000,            // Set the maximum cache size
+		DefaultExpiration: 5 * time.Minute, // Default expiration time
+		EvictionPolicy:    "LRU",           // Set the eviction policy
+		HashFunc:          fnv.New32,       // Use FNV-1 32-bit hash function
+	}
 
-    // Initialize the cache with custom settings
-    c, _ := swiftcache.NewCache(cacheConfig)
+	// Initialize the cache with custom settings
+	c, _ := swiftcache.NewCache(cacheConfig)
 
-    // Use the cache with the configured settings
-    // ...
+	// Use the cache with the configured settings
+	// ...
 }
-
 ```
 
 ## How it works
