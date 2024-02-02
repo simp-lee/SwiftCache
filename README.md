@@ -77,13 +77,13 @@ import (
 
 func main() {
     // Initialize the cache with default settings
-    c, _ := swiftcache.NewCache()
+    cache, _ := swiftcache.NewCache()
 
     // Set a value with default expiration
-    c.Set("myKey", "myValue", swiftcache.DefaultExpiration)
+    cache.Set("myKey", "myValue", swiftcache.DefaultExpiration)
 
     // Retrieve and check if the value exists
-    value, found := c.Get("myKey")
+    value, found := cache.Get("myKey")
     if found {
         fmt.Println("Found myKey: ", value)
     }
@@ -99,6 +99,7 @@ To customize SwiftCache's behavior, such as segment count or eviction policy:
 package main
 
 import (
+    "fmt"
     "github.com/simp-lee/swiftcache"
     "hash/fnv"
     "time"
@@ -114,12 +115,17 @@ func main() {
     }
 
     // Initialize the cache with custom settings
-    c, _ := swiftcache.NewCache(cacheConfig)
+    cache, err := swiftcache.NewCache(cacheConfig)
 
+    if err != nil {
+        fmt.Println("Cache initialization failed: %v", err)
+    }
     // Use the cache with the configured settings
     // ...
 }
 ```
+
+
 
 ## How it works
 
@@ -153,7 +159,62 @@ In summary, SwiftCache's design principles—segmented storage, tailored evictio
 
 ## API
 
-SwiftCache provides a simple yet powerful API, including methods for setting, getting, and deleting cache entries, as well as incrementing and decrementing numerical values. For a full list of methods and their descriptions, see our API documentation.
+### Initialization
+
+`NewCache(options ...CacheConfig) (*Cache, error)`: Creates a new cache instance with optional configuration. The CacheConfig struct allows customization of segments, maximum cache size, default expiration, hash function, and eviction policy.
+
+### Basic Operations
+
+`Set(key string, value interface{}, ttl time.Duration)`: Adds a new item to the cache or updates an existing item's value and expiration time. ttl can be set to NoExpiration for items that should not expire.
+
+`Get(key string) (interface{}, bool)`: Retrieves an item from the cache. Returns the item and a boolean indicating whether the key was found.
+
+`Delete(key string)`: Removes an item from the cache by its key.
+
+`Flush()`: Clears all items from the cache.
+
+### Advanced Features
+
+`GetWithExpiration(key string) (interface{}, time.Time, bool)`: Similar to `Get`, but also returns the expiration time of the item if it exists.
+
+`ItemCount() int`: Returns the total number of items currently in the cache, including those that may have expired but have not yet been cleaned up.
+
+`Items() map[string]interface{}`: Returns a copy of all unexpired items in the cache as a map.
+
+`Item(key string) (*Item, bool)`: Retrieve an item along with its metadata from the cache. It returns a pointer to the Item and a boolean indicating whether the key was found. The Item struct includes the value, expiration time, and other internal details. This method is particularly useful when you need more information about a cache item, such as its expiration time, in addition to the value itself.
+
+```go
+cache.Set("userId", 12345, 5*time.Minute)
+
+item, found := cache.Item("userId")
+if found {
+    fmt.Printf("User ID: %v, Expires at: %v\n", item.Value, time.Unix(0, item.Expiration))
+}
+```
+
+`Increment(key string, n int64) error`: Increments the value of a numerical item by n. Returns an error if the key does not exist, the item has expired, or the item's value is not a number.
+
+`Decrement(key string, n int64) error`: Decrements the value of a numerical item by n. Similar error conditions apply as with `Increment`.
+
+```go
+cache.Set("counter", 10, swiftcache.DefaultExpiration)
+
+err := cache.Increment("counter", 5)
+if err == nil {
+    counter, _ := cache.Get("counter")
+    fmt.Printf("Counter after increment: %v\n", counter)
+}
+
+err = cache.Decrement("counter", 3)
+if err == nil {
+    counter, _ := cache.Get("counter")
+    fmt.Printf("Counter after decrement: %v\n", counter)
+}
+```
+
+### Eviction and Expiration
+
+`OnEvicted(f func(string, interface{}))`: Sets a callback function that is called whenever an item is evicted from the cache. This can be due to expiration or when an item is manually deleted.
 
 ## Acknowledgments
 

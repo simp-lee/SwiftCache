@@ -21,12 +21,8 @@ type CacheConfig struct {
 }
 
 const (
-	// For use with functions that take an expiration time. Equivalent to
-	// passing in the same expiration duration as was given to New() or
-	// NewFrom() when the cache was created (e.g. 5 minutes.)
-	DefaultExpiration time.Duration = 0
-	// For use with functions that take an expiration time.
-	NoExpiration          time.Duration = -1
+	DefaultExpiration     time.Duration = 0     // Default expiration time
+	NoExpiration          time.Duration = -1    // For use with functions that take an expiration time.
 	DefaultSegmentCount                 = 512   // Default number of segments to reduce lock contention
 	MaxCacheSize                        = 1000  // Default maximum size for each cache segment
 	DefaultEvictionPolicy               = "LRU" // Default eviction policy: "LRU".
