@@ -1,5 +1,7 @@
 # SwiftCache
 
+> For cache persistence support, please use [@simp-lee/cache](https://github.com/simp-lee/cache) package instead.
+
 `SwiftCache` is a streamlined, in-memory cache library for Go, inspired by the **segmented caching concepts** from [freecache](https://github.com/coocood/freecache) and [bigcache](https://github.com/allegro/bigcache). Optimized for single-machine use, it encompasses under **600 lines** of code including comments, offering a robust yet concise caching solution. Influenced by [go-cache](https://github.com/patrickmn/go-cache), `SwiftCache` features a user-friendly interface for effortless integration.
 
 A key feature is its thread-safe `map[string]interface{}` structure with support for entry expiration, eliminating the need for content serialization or network transmission. This allows for versatile object storage within the cache.
